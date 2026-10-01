@@ -1,0 +1,11 @@
+{
+  "generated_at": "2026-10-01T21:02:29.484005+00:00",
+  "hash_method": "sha256",
+  "note": "Covers bundle inputs only. The workflow (.github/workflows/zero-dollar-compute.yml) is the trust root and carries EXPECTED_MANIFEST_SHA256; its identity is anchored by the Git commit of the run plus the out-of-band workflow SHA.",
+  "inputs": {
+    "zero_dollar_run_bundle/run_job.py": "fa368adacec40c0ab158b2ff93d5b808f966cacf42851fe28eef3e5363c46dcf",
+    "zero_dollar_run_bundle/workload.py": "6c958a1093af38eaa678f211d837a9730c55488f400a1110c2cd711bbc3bf67e",
+    "zero_dollar_run_bundle/test_workload.py": "9b0cb8939c050d7f876f4f49b74ed3659143ab356da3ff6d89f4ad9a8d8fc160",
+    "zero_dollar_run_bundle/README.md": "2aa8197e95e3df437eae7ee60d1f72bd2cd4a8ab5da0c7ce177dcbe78d6422c6"
+  }
+}

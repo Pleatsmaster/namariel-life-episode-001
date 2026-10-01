@@ -1,0 +1,87 @@
+name: zero-dollar-compute
+
+# Bounded, reproducible compute job for the LIFE-EPISODE-001 zero-dollar lane.
+# Cost: $0 on a PUBLIC repository using standard GitHub-hosted runners.
+# DO NOT change runs-on to a larger runner: larger runners are ALWAYS billed,
+# even on public repositories (GitHub Actions billing docs, verified 2026-10-01).
+#
+# Hardened descendant (operator review 2026-10-01): manual dispatch ONLY.
+# Prepared code is not authorized execution — no push trigger, so no push
+# anywhere in this repository can launch external compute on its own.
+# Least authority: contents: read, no persisted credentials. All actions
+# pinned to full commit SHAs (resolved 2026-10-01), not movable major tags.
+#
+# TRUST ROOT: this workflow is the execution gate. It verifies the manifest
+# identity (EXPECTED_MANIFEST_SHA256, embedded below) and every
+# manifest-listed input BEFORE run_job.py is invoked — because run_job.py
+# cannot securely verify itself (a corrupted run_job.py would already be
+# executing when it decided whether it was trustworthy). The workflow's own
+# identity is anchored by the immutable Git commit of the run plus the
+# workflow SHA recorded out-of-band by the operator.
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: "Job identifier recorded in results.json"
+        required: false
+        default: "manual"
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_MANIFEST_SHA256: 0e2ad8cdcf234e536f8ecbd69eb9cff9920673fa2ee5c6d6f416c9239a1835c9
+  JOB_ID: ${{ inputs.job_id || 'manual' }}
+
+jobs:
+  compute:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out bundle
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, pinned 2026-10-01
+        with:
+          persist-credentials: false
+
+      - name: Set up Python (pinned minor version, stdlib only, no pip installs)
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5, pinned 2026-10-01
+        with:
+          python-version: "3.12"
+
+      - name: Verify manifest identity (trust anchor)
+        run: |
+          echo "$EXPECTED_MANIFEST_SHA256  zero_dollar_run_bundle/MANIFEST.json" | sha256sum -c -
+
+      - name: Verify every manifest-listed input before executing anything
+        run: |
+          python3 - <<'EOF'
+          import hashlib, json, sys
+          manifest = json.load(open("zero_dollar_run_bundle/MANIFEST.json"))
+          bad = []
+          for rel, want in manifest["inputs"].items():
+              try:
+                  with open(rel, "rb") as f:
+                      got = hashlib.sha256(f.read()).hexdigest()
+              except FileNotFoundError:
+                  bad.append(f"{rel}: MISSING")
+                  continue
+              if got != want:
+                  bad.append(f"{rel}: MISMATCH")
+          if bad:
+              print("WORKFLOW INPUT VERIFICATION FAILED — refusing to execute:")
+              for b in bad:
+                  print(f"  {b}")
+              sys.exit(2)
+          print(f"workflow gate: {len(manifest['inputs'])} inputs verified against trusted manifest")
+          EOF
+
+      - name: Run bounded job
+        run: python3 zero_dollar_run_bundle/run_job.py --job-id "$JOB_ID"
+
+      - name: Upload results artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, pinned 2026-10-01
+        with:
+          name: job-results
+          path: zero_dollar_run_bundle/out/
+          retention-days: 7
